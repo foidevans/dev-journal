@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>All Entries</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main>
+    <h1>All Entries 📖</h1>
+    <a href="/">← Add new entry</a>
+
+    <div id="entries-list"></div>
+  </main>
+
+  <script>
+    const entriesList = document.getElementById("entries-list");
+
+    const loadEntries = async () => {
+      try {
+        const res = await fetch("/api/entries");
+        const entries = await res.json();
+
+        if (entries.length === 0) {
+          entriesList.innerHTML = "<p>No entries yet. Go learn something!</p>";
+          return;
+        }
+
+        entriesList.innerHTML = entries
+          .reverse()
+          .map((entry) => `
+            <div class="entry-card">
+              <span class="entry-date">${entry.date}</span>
+              <h2>${entry.title}</h2>
+              <p>${entry.content}</p>
+            </div>
+          `)
+          .join("");
+      } catch (err) {
+        entriesList.innerHTML = "<p>Could not load entries.</p>";
+      }
+    };
+
+    loadEntries();
+  </script>
+</body>
+</html>
