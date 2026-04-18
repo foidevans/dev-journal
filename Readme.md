@@ -1,59 +1,186 @@
-In Node.js, process.env.PORT || 3000 is a common pattern used to set the port number for a web server. It translates to: "Use the port number defined in the environment, or use 3000 as a backup".
-So basically it checks for an env called PORT and it is also important to know that the 3000 is a hardcoded default, you can use any valid number
+# Dev Journal
 
-it is important to store your port number as an env because, Most cloud providers (like Heroku, AWS, or Azure) dynamically assign a port to your app at runtime. They inject this number into process.env.PORT. If your app is hard-coded to only listen on 3000, it will crash because it isn't listening where the platform expects it to. 
-It is also important to note that your app runs in different stages eg, Development: You might use port 3000 on your laptop.
-Testing: You might use port 5000 to avoid interfering with your dev server.
-Production: The server might require port 80 or 8080.
-Using .env lets you change these values without modifying your source code every time you move between environment
+A simple Node.js project to log your daily learning entries. This project demonstrates core Node.js concepts such as environment variables, file system operations, routing, and serving static files.
 
-why do we need path modules?
-File paths looks different on different os, eg
-Windows:  data\entries.json
-Mac/Linux: data/entries.json 
-so if you hardcode / or \, your code would break on another machine
+---
 
-in recent node versions (v20.11.0+ and v21.2.0+), to get the directory without the boilerplate, we use 
+## Table of Contents
 
+- [Project Overview](#project-overview)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [Why Use the `path` Module?](#why-use-the-path-module)
+- [Handling Directory Paths in Node.js](#handling-directory-paths-in-nodejs)
+- [CORS and OPTIONS Preflight Requests](#cors-and-options-preflight-requests)
+- [Routing and URL Parsing](#routing-and-url-parsing)
+- [API vs Static File Routing](#api-vs-static-file-routing)
+- [Project Structure](#project-structure)
+
+---
+
+## Project Overview
+
+**Dev Journal** is a Node.js application that allows you to record and view daily learning entries. It uses a simple JSON file as a database and serves both API endpoints and static HTML/CSS files.
+
+---
+
+## Getting Started
+
+1. **Clone the repository**
+2. **Install dependencies** (if any)
+3. **Set up your `.env` file** (see below)
+4. **Run the server:**
+   ```sh
+   node index.js
+   ```
+5. Visit [http://localhost:9000](http://localhost:9000) (or your configured port)
+
+---
+
+## Environment Variables
+
+### Why use `process.env.PORT || 3000`?
+
+This pattern sets the port number for your server:
+
+```js
+const PORT = process.env.PORT || 3000;
+```
+
+- **`process.env.PORT`**: Uses the port defined in your environment (e.g., by cloud providers like Heroku, AWS, Azure).
+- **`3000`**: Fallback default if no environment variable is set.
+
+**Why is this important?**
+- Cloud providers dynamically assign ports at runtime.
+- Hardcoding a port (like 3000) can cause your app to crash on deployment.
+- Using `.env` files lets you easily switch between development, testing, and production environments without changing your source code.
+
+---
+
+## Why Use the `path` Module?
+
+File paths differ across operating systems:
+
+- **Windows:** `data\entries.json`
+- **Mac/Linux:** `data/entries.json`
+
+Hardcoding `/` or `\` can break your code on another OS. The Node.js `path` module ensures your file paths are always correct, regardless of the platform.
+
+---
+
+## Handling Directory Paths in Node.js
+
+### Modern Node.js (v20.11.0+)
+
+```js
 const __dirname = import.meta.dirname;
 const __filename = import.meta.filename;
+```
 
-But for older versions we use 
+### Older Node.js Versions
+
+```js
+import { fileURLToPath } from "url";
+import path from "path";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+```
 
-OPTIONS handling (preflight) in routes
-When a browser makes a POST/PUT/DELETE request, it first sends an OPTIONS preflight request. Your router doesn't handle it, so those requests will fail from a real frontend. You need something like:
+This ensures compatibility and correct path resolution in all environments.
 
+---
+
+## CORS and OPTIONS Preflight Requests
+
+When making `POST`, `PUT`, or `DELETE` requests from a browser, an **OPTIONS preflight request** is sent first. If your server doesn't handle this, requests from real frontends will fail.
+
+**Example handling:**
+
+```js
 if (req.method === "OPTIONS") {
-  res.writeHead(204);
-  return res.end();
+  res.writeHead(204, {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  });
+  res.end();
+  return;
 }
+```
 
-Extraction of Path part of a request url, deals with a modern way to "clean" an incoming request URL so you can easily figure out what page or route a user is trying to visit
+This enables cross-origin requests and ensures smooth API communication.
 
-const requestUrl = new URL(req.url, http://${req.headers.host}); 
+---
+
+## Routing and URL Parsing
+
+To determine which route a user is visiting, Node.js uses the `URL` object:
+
+```js
+const requestUrl = new URL(req.url, `http://${req.headers.host}`);
 const pathname = requestUrl.pathname;
+```
 
-req.url is the path the user requested eg, /about?name=favour
-req.headers.host is the domain + port eg, localhost:3000
+- **`req.url`**: The requested path (e.g., `/about?name=favour`)
+- **`req.headers.host`**: The domain and port (e.g., `localhost:3000`)
+- **`pathname`**: Extracts just the path, without query parameters.
 
-so the new URL constructor combines them into 
-http://localhost:3000/about?name=favour
-so therefore, requestUrl becomes a proper url object you can work with
+| Full URL                              | Pathname   |
+|----------------------------------------|------------|
+| http://localhost:3000/                 | `/`        |
+| http://localhost:3000/about            | `/about`   |
+| http://localhost:3000/user?id=5        | `/user`    |
 
-.pathname extracts just the path part of the url with no query params
+This makes route handling clean and robust.
 
-eg,
-Full URL	                      pathname
-http://localhost:3000/	             /
-http://localhost:3000/about  	   /about
-http://localhost:3000/user?id=5 	/user
+---
 
-in simple terms This code is doing:
+## API vs Static File Routing
 
-“Take the incoming request, build a full URL from it, then get only the route path.”
+In `routes.js`:
 
-In the routes.js ,api routes must come first before static files routes
+- **API routes** (e.g., `/api/entries`) must be handled **before** static file routes.
+- Static files (HTML, CSS) are served for paths like `/`, `/entries.html`, `/style.css`.
+- Unmatched routes return a 404 JSON error.
 
+---
 
+## Project Structure
+
+```
+.env
+.gitignore
+index.js
+package.json
+Readme.md
+routes.js
+controllers/
+  entryController.js
+data/
+  entries.json
+public/
+  entries.html
+  index.html
+  style.css
+utils/
+  helper.js
+```
+
+- **controllers/**: API logic (reading/writing entries)
+- **data/**: JSON "database"
+- **public/**: Static HTML/CSS files
+- **utils/**: Helper functions (responses, static file serving)
+
+---
+
+## Learn More
+
+- [Node.js Documentation](https://nodejs.org/en/docs)
+- [dotenv](https://www.npmjs.com/package/dotenv)
+- [MDN: CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS)
+- [Node.js Path Module](https://nodejs.org/api/path.html)
+
+---
+
+Happy journaling!
